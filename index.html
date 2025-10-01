@@ -17,6 +17,7 @@
     .btn-delete { background: red; color: white; border: none; border-radius: 4px; padding: 6px 12px; }
     .btn-add { background: green; color: white; border: none; border-radius: 4px; padding: 8px 14px; }
     .btn-reset { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 8px 14px; margin-left: 10px; }
+    .btn-export { background: #17a2b8; color: white; border: none; border-radius: 4px; padding: 8px 14px; margin-left: 10px; }
   </style>
 </head>
 <body>
@@ -28,6 +29,7 @@
     <textarea id="channelInput" rows="3" placeholder="contoh: canalplus, konbini, euronews"></textarea><br>
     <button type="submit" class="btn-add">Tambah Channel</button>
     <button type="button" class="btn-reset" id="resetBtn">Reset Semua Channel</button>
+    <button type="button" class="btn-export" id="exportBtn">Export ke CSV</button>
   </form>
 
   <!-- Tabel hasil -->
@@ -45,11 +47,13 @@
   <script>
     // Ambil dari localStorage atau default
     let channels = JSON.parse(localStorage.getItem("channels")) || ["canalplus", "konbini", "euronews"];
+    let channelData = {}; // simpan hasil total videos
 
     const tableBody = document.querySelector("#resultTable tbody");
     const channelForm = document.getElementById("channelForm");
     const channelInput = document.getElementById("channelInput");
     const resetBtn = document.getElementById("resetBtn");
+    const exportBtn = document.getElementById("exportBtn");
 
     // Fungsi simpan ke localStorage
     function saveChannels() {
@@ -65,11 +69,12 @@
         const data = await response.json();
 
         const totalVideos = data.list?.[0]?.["owner.videos_total"] ?? "Tidak tersedia";
-
+        channelData[channel] = totalVideos;
         addRow(channel, totalVideos);
 
       } catch (error) {
         console.error("Gagal fetch data untuk channel:", channel, error);
+        channelData[channel] = "Error";
         addRow(channel, "Error");
       }
     }
@@ -86,6 +91,7 @@
       // Event hapus channel
       row.querySelector(".btn-delete").addEventListener("click", () => {
         channels = channels.filter(c => c !== channel);
+        delete channelData[channel];
         saveChannels();
         row.remove();
       });
@@ -96,6 +102,7 @@
     // Load semua channel
     function loadChannels() {
       tableBody.innerHTML = "";
+      channelData = {};
       channels.forEach(fetchChannelData);
     }
 
@@ -122,9 +129,34 @@
     resetBtn.addEventListener("click", () => {
       if (confirm("Yakin ingin menghapus semua channel?")) {
         channels = [];
+        channelData = {};
         saveChannels();
         tableBody.innerHTML = "";
       }
+    });
+
+    // Fungsi export ke CSV
+    exportBtn.addEventListener("click", () => {
+      if (channels.length === 0) {
+        alert("Tidak ada data untuk diexport!");
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Channel,Total Videos\n";
+
+      channels.forEach(ch => {
+        const videos = channelData[ch] ?? "Belum diambil";
+        csvContent += `${ch},${videos}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "dailymotion_channels.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     });
 
     // Jalankan saat awal
