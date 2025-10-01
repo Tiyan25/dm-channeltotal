@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dailymotion Channel Video Count</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f8f9fa; }
+    h2 { margin-bottom: 15px; }
+    table { border-collapse: collapse; width: 80%; background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+    th { background-color: #007BFF; color: white; }
+    tr:nth-child(even) { background-color: #f2f2f2; }
+    form { margin-bottom: 20px; }
+    textarea, button { padding: 8px; margin: 5px 0; }
+    textarea { width: 100%; }
+    button { cursor: pointer; }
+    .btn-delete { background: red; color: white; border: none; border-radius: 4px; padding: 6px 12px; }
+    .btn-add { background: green; color: white; border: none; border-radius: 4px; padding: 8px 14px; }
+    .btn-reset { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 8px 14px; margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Dailymotion Channel Video Count</h2>
+
+  <!-- Form input tambah banyak channel -->
+  <form id="channelForm">
+    <label for="channelInput">Masukkan channel (pisahkan dengan koma atau enter):</label>
+    <textarea id="channelInput" rows="3" placeholder="contoh: canalplus, konbini, euronews"></textarea><br>
+    <button type="submit" class="btn-add">Tambah Channel</button>
+    <button type="button" class="btn-reset" id="resetBtn">Reset Semua Channel</button>
+  </form>
+
+  <!-- Tabel hasil -->
+  <table id="resultTable">
+    <thead>
+      <tr>
+        <th>Channel</th>
+        <th>Total Videos</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    // Ambil dari localStorage atau default
+    let channels = JSON.parse(localStorage.getItem("channels")) || ["canalplus", "konbini", "euronews"];
+
+    const tableBody = document.querySelector("#resultTable tbody");
+    const channelForm = document.getElementById("channelForm");
+    const channelInput = document.getElementById("channelInput");
+    const resetBtn = document.getElementById("resetBtn");
+
+    // Fungsi simpan ke localStorage
+    function saveChannels() {
+      localStorage.setItem("channels", JSON.stringify(channels));
+    }
+
+    // Fungsi ambil data API untuk satu channel
+    async function fetchChannelData(channel) {
+      const url = `https://api.dailymotion.com/user/${channel}/videos?fields=owner.videos_total&limit=1`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const totalVideos = data.list?.[0]?.["owner.videos_total"] ?? "Tidak tersedia";
+
+        addRow(channel, totalVideos);
+
+      } catch (error) {
+        console.error("Gagal fetch data untuk channel:", channel, error);
+        addRow(channel, "Error");
+      }
+    }
+
+    // Fungsi tambah baris ke tabel
+    function addRow(channel, totalVideos) {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${channel}</td>
+        <td>${totalVideos}</td>
+        <td><button class="btn-delete">Hapus</button></td>
+      `;
+
+      // Event hapus channel
+      row.querySelector(".btn-delete").addEventListener("click", () => {
+        channels = channels.filter(c => c !== channel);
+        saveChannels();
+        row.remove();
+      });
+
+      tableBody.appendChild(row);
+    }
+
+    // Load semua channel
+    function loadChannels() {
+      tableBody.innerHTML = "";
+      channels.forEach(fetchChannelData);
+    }
+
+    // Event tambah channel baru (banyak sekaligus)
+    channelForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const newChannels = channelInput.value
+        .split(/[\n,]+/)          // pisahkan pakai koma atau enter
+        .map(c => c.trim())
+        .filter(c => c.length > 0);
+
+      newChannels.forEach(ch => {
+        if (!channels.includes(ch)) {
+          channels.push(ch);
+          fetchChannelData(ch);
+        }
+      });
+
+      saveChannels();
+      channelInput.value = "";
+    });
+
+    // Event reset semua channel
+    resetBtn.addEventListener("click", () => {
+      if (confirm("Yakin ingin menghapus semua channel?")) {
+        channels = [];
+        saveChannels();
+        tableBody.innerHTML = "";
+      }
+    });
+
+    // Jalankan saat awal
+    loadChannels();
+  </script>
+</body>
+</html>
